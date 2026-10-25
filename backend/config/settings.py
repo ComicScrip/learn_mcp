@@ -27,6 +27,10 @@ DATABASES = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Les stats regroupent les tâches par jour : il faut savoir où « minuit » tombe.
+USE_TZ = True
+TIME_ZONE = "Europe/Paris"
+
 # Pas d'auth pour garder l'exemple lisible (à NE PAS faire en prod).
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [],

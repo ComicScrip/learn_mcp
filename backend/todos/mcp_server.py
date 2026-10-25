@@ -9,7 +9,12 @@ Une MCP App = 2 primitives MCP classiques reliées entre elles :
 Quand le LLM appelle `show_todos`, l'hôte (Claude, VS Code...) voit ce lien,
 télécharge la ressource, l'affiche dans une iframe, puis envoie le résultat
 du tool à l'iframe. L'iframe peut ensuite rappeler d'autres tools du serveur.
+
+Ici DEUX tools ouvrent la même UI (show_todos et show_stats) : l'app React
+regarde le contenu du résultat ("todos" ou "stats") pour savoir quoi afficher.
 """
+
+from typing import Literal
 
 from django.conf import settings
 from fastmcp import FastMCP
@@ -17,6 +22,7 @@ from fastmcp.apps import AppConfig
 
 from .models import Todo
 from .serializers import TodoSerializer
+from .stats import todo_stats
 
 APP_URI = "ui://todos/app.html"
 
@@ -24,7 +30,7 @@ mcp = FastMCP("Todos")
 
 
 def _all_todos() -> dict:
-    """Format renvoyé par tous les tools : {"todos": [...]}.
+    """Format renvoyé par les tools de liste : {"todos": [...]}.
 
     FastMCP le transmet en `structuredContent`, que l'app React lit directement.
     """
@@ -39,12 +45,23 @@ def todo_app() -> str:
     return settings.MCP_APP_HTML.read_text()
 
 
-# --- 2. Le tool qui ouvre l'UI -------------------------------------------------
+# --- 2. Les tools qui ouvrent l'UI ---------------------------------------------
 # app=AppConfig(resource_uri=...) ajoute `_meta.ui.resourceUri` au tool.
 @mcp.tool(app=AppConfig(resource_uri=APP_URI))
 def show_todos() -> dict:
     """Affiche la liste de tâches dans une interface interactive."""
     return _all_todos()
+
+
+@mcp.tool(app=AppConfig(resource_uri=APP_URI))
+def show_stats(period: Literal["week", "month"] = "week", offset: int = 0) -> dict:
+    """Affiche un graphique des tâches effectuées / à faire.
+
+    period="week" : jour par jour sur une semaine ; period="month" : semaine
+    par semaine sur un mois. offset=0 pour la période en cours, -1 pour la
+    précédente, etc.
+    """
+    return {"stats": todo_stats(period, offset)}
 
 
 # --- 3. Des tools "normaux", appelables par le LLM ET par l'UI ---------------
@@ -64,6 +81,6 @@ def add_todo(title: str) -> dict:
 def toggle_todo(todo_id: int) -> dict:
     """Coche / décoche une tâche."""
     todo = Todo.objects.get(pk=todo_id)
-    todo.done = not todo.done
+    todo.set_done(not todo.done)  # renseigne / efface done_at
     todo.save()
     return _all_todos()

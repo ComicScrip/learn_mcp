@@ -1,69 +1,57 @@
 import type { CallToolResult } from "@modelcontextprotocol/client";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
+import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-
-type Todo = { id: number; title: string; done: boolean };
-
-// Tous nos tools Python renvoient {"todos": [...]} -> c'est le `structuredContent`.
-const todosFrom = (result: CallToolResult) =>
-  (result.structuredContent as { todos: Todo[] } | undefined)?.todos ?? [];
+import { StatsView } from "./StatsView";
+import "./styles.css";
+import { TodoList } from "./TodoList";
+import { dataFrom, type Stats, type Todo } from "./types";
 
 function TodoApp() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [title, setTitle] = useState("");
+  const [todos, setTodos] = useState<Todo[] | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [view, setView] = useState<"todos" | "stats">("todos");
+
+  // Tous les résultats de tools passent par ici, qu'ils viennent de l'hôte
+  // (ontoolresult) ou d'un appel fait par l'UI (callServerTool).
+  // Le contenu décide de la vue : {"todos": ...} ou {"stats": ...}.
+  const handleResult = (result: CallToolResult) => {
+    const data = dataFrom(result);
+    if (data.todos) {
+      setTodos(data.todos);
+      setView("todos");
+    }
+    if (data.stats) {
+      setStats(data.stats);
+      setView("stats");
+    }
+  };
 
   // 1. Connexion à l'hôte (Claude, VS Code...) via postMessage avec window.parent.
   const { app, isConnected, error } = useApp({
     appInfo: { name: "Todos", version: "1.0.0" },
     capabilities: {},
     onAppCreated: (app) => {
-      // 2. L'hôte nous pousse le résultat du tool qui a ouvert l'UI (show_todos).
-      app.ontoolresult = (result) => setTodos(todosFrom(result));
+      // 2. L'hôte nous pousse le résultat du tool qui a ouvert l'UI
+      //    (show_todos ou show_stats).
+      app.ontoolresult = handleResult;
     },
   });
 
-  if (error) return <p>Erreur : {error.message}</p>;
-  if (!isConnected || !app) return <p>Connexion à l'hôte…</p>;
+  // Reprend les couleurs, polices et le thème clair/sombre de l'hôte.
+  useHostStyles(app, app?.getHostContext());
+
+  if (error) return <p className="muted">Erreur : {error.message}</p>;
+  if (!isConnected || !app) return <p className="muted">Connexion à l'hôte…</p>;
 
   // 3. L'UI appelle elle-même des tools du serveur (l'hôte relaie la requête).
-  const call = async (name: string, args: Record<string, unknown>) => {
-    const result = await app.callServerTool({ name, arguments: args });
-    setTodos(todosFrom(result));
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    handleResult(await app.callServerTool({ name, arguments: args }));
   };
 
-  return (
-    <main style={{ fontFamily: "system-ui", padding: 16 }}>
-      <h2>Mes tâches</h2>
-      <ul style={{ listStyle: "none", padding: 0 }}>
-        {todos.map((t) => (
-          <li key={t.id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={t.done}
-                onChange={() => call("toggle_todo", { todo_id: t.id })}
-              />{" "}
-              <span style={{ textDecoration: t.done ? "line-through" : "none" }}>
-                {t.title}
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!title.trim()) return;
-          call("add_todo", { title });
-          setTitle("");
-        }}
-      >
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nouvelle tâche" />
-        <button type="submit">Ajouter</button>
-      </form>
-    </main>
-  );
+  if (view === "stats" && stats) return <StatsView stats={stats} call={call} />;
+  if (todos) return <TodoList todos={todos} call={call} />;
+  return <p className="muted">Chargement…</p>;
 }
 
 createRoot(document.getElementById("root")!).render(

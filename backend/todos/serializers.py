@@ -8,4 +8,11 @@ from .models import Todo
 class TodoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Todo
-        fields = ["id", "title", "done"]
+        fields = ["id", "title", "done", "created_at", "done_at"]
+        read_only_fields = ["created_at", "done_at"]
+
+    def update(self, instance, validated_data):
+        # Via l'API REST aussi, cocher une tâche doit renseigner done_at.
+        if "done" in validated_data:
+            instance.set_done(validated_data.pop("done"))
+        return super().update(instance, validated_data)

@@ -1,0 +1,146 @@
+/* Couleurs : on reprend les variables CSS fournies par l'hôte (useHostStyles)
+   quand elles existent, sinon nos valeurs par défaut. */
+:root {
+  color-scheme: light;
+  --surface: var(--color-background-primary, #fcfcfb);
+  --surface-2: var(--color-background-secondary, #f3f2ef);
+  --text: var(--color-text-primary, #0b0b0b);
+  --text-secondary: var(--color-text-secondary, #52514e);
+  --border: var(--color-border-primary, #e2e1dc);
+  --grid: #ebeae6;
+  --axis: #c9c8c2;
+  --hover: rgba(0, 0, 0, 0.04);
+  --series-done: #2a78d6;
+  --series-pending: #eb6834;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface: var(--color-background-primary, #1a1a19);
+    --surface-2: var(--color-background-secondary, #252523);
+    --text: var(--color-text-primary, #f0efec);
+    --text-secondary: var(--color-text-secondary, #c3c2b7);
+    --border: var(--color-border-primary, #3a3a37);
+    --grid: #2c2c2a;
+    --axis: #4a4a46;
+    --hover: rgba(255, 255, 255, 0.05);
+    --series-done: #3987e5;
+    --series-pending: #d95926;
+  }
+}
+
+/* L'hôte pose data-theme="dark" sur <html> quand Claude est en mode sombre. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: var(--color-background-primary, #1a1a19);
+  --surface-2: var(--color-background-secondary, #252523);
+  --text: var(--color-text-primary, #f0efec);
+  --text-secondary: var(--color-text-secondary, #c3c2b7);
+  --border: var(--color-border-primary, #3a3a37);
+  --grid: #2c2c2a;
+  --axis: #4a4a46;
+  --hover: rgba(255, 255, 255, 0.05);
+  --series-done: #3987e5;
+  --series-pending: #d95926;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  font-size: 14px;
+}
+
+button, input { font: inherit; color: inherit; }
+
+.card { padding: 16px; max-width: 720px; }
+.header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+h2 { margin: 0 0 12px; font-size: 18px; font-weight: 600; }
+.muted { color: var(--text-secondary); }
+.small { font-size: 12px; }
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+button:hover:not(:disabled) { background: var(--surface-2); }
+button:disabled { opacity: 0.35; cursor: default; }
+button.link { border: none; background: none; padding: 4px 0; color: var(--text-secondary); }
+button.link:hover { color: var(--text); background: none; }
+
+/* --- Liste --------------------------------------------------------------- */
+.add { display: flex; gap: 8px; margin-bottom: 12px; }
+.add input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.todos { list-style: none; padding: 0; margin: 0; }
+.todos li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.todos label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.todos .done { text-decoration: line-through; color: var(--text-secondary); }
+.todos time { font-size: 12px; white-space: nowrap; }
+
+/* --- Stats --------------------------------------------------------------- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.segmented { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 2px; }
+.segmented button { border: none; background: none; padding: 4px 12px; border-radius: 6px; color: var(--text-secondary); }
+.segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.nav { display: flex; align-items: center; gap: 8px; }
+.nav button { padding: 2px 10px; font-size: 16px; line-height: 1.4; }
+/* Largeur fixe : les flèches ne bougent pas quand le titre change de longueur. */
+.period-title { font-weight: 500; width: 210px; text-align: center; }
+
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.tile { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.tile-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.tile strong { display: block; font-size: 22px; font-weight: 600; margin-top: 2px; }
+
+.legend { display: flex; gap: 16px; list-style: none; padding: 0; margin: 0 0 8px; font-size: 12px; color: var(--text-secondary); }
+.legend li, .tooltip-row { display: flex; align-items: center; gap: 6px; }
+i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+.chart { margin-bottom: 8px; }
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+.tooltip-row b { margin-left: auto; padding-left: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+th { color: var(--text-secondary); font-weight: 500; }
+td:not(:first-child), th:not(:first-child) { text-align: right; }
+
+@media (max-width: 480px) {
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .period-title { width: auto; }
+}

@@ -1,19 +1,24 @@
 # MCP App minimale : Django DRF + FastMCP + React
 
 Une todo-list qui s'affiche **dans la conversation** (Claude, VS Code…) et sur
-laquelle on peut cliquer.
+laquelle on peut cliquer, avec un graphique de suivi (semaine / mois).
 
 ```
 learn_mcp/
 ├── backend/                  Django + DRF + FastMCP (un seul process)
 │   ├── config/asgi.py        aiguille /mcp -> FastMCP, le reste -> Django
-│   ├── todos/models.py       modèle Todo
+│   ├── todos/models.py       modèle Todo (+ created_at / done_at)
 │   ├── todos/serializers.py  serializer DRF, partagé par l'API REST ET les tools MCP
-│   ├── todos/views.py        API REST classique  (/api/todos/)
-│   ├── todos/mcp_server.py   ⭐ le serveur MCP : 1 ressource UI + 3 tools
+│   ├── todos/stats.py        regroupement par jour (semaine) ou par semaine (mois)
+│   ├── todos/views.py        API REST classique  (/api/todos/, /api/todos/stats/)
+│   ├── todos/mcp_server.py   ⭐ le serveur MCP : 1 ressource UI + 4 tools
+│   ├── todos/management/commands/seed_todos.py   données factices
+│   ├── run_stdio.py          point d'entrée pour Claude Desktop (stdio)
 │   └── try_client.py         client MCP en Python pour voir ce que voit l'hôte
 └── frontend/                 l'UI React
-    ├── src/main.tsx          ⭐ l'app : reçoit le résultat du tool, rappelle des tools
+    ├── src/main.tsx          ⭐ connexion à l'hôte + choix de la vue selon le résultat
+    ├── src/TodoList.tsx      vue liste
+    ├── src/StatsView.tsx     vue graphique (Recharts)
     └── vite.config.ts        build en UN SEUL fichier : dist/mcp-app.html
 ```
 
@@ -45,16 +50,30 @@ Une MCP App, c'est **deux primitives MCP classiques reliées entre elles** :
 L'iframe ne parle **jamais** directement à ton serveur : tout passe par l'hôte
 via `postMessage`. Pas besoin d'API, de CORS ni d'auth côté UI.
 
-### Les 3 tools
+### Les 4 tools
 
-| Tool | Visible par | Rôle |
-|---|---|---|
-| `show_todos` | LLM | ouvre l'UI (c'est lui qui a `resourceUri`) |
-| `add_todo` | LLM + UI | le LLM peut ajouter une tâche en texte, l'UI aussi |
-| `toggle_todo` | UI seulement | `visibility=["app"]` : caché au LLM |
+| Tool | Visible par | Rôle | Renvoie |
+|---|---|---|---|
+| `show_todos` | LLM + UI | ouvre l'UI sur la liste | `{"todos": [...]}` |
+| `show_stats` | LLM + UI | ouvre l'UI sur le graphique (`period`, `offset`) | `{"stats": {...}}` |
+| `add_todo` | LLM + UI | ajoute une tâche | `{"todos": [...]}` |
+| `toggle_todo` | UI seulement | `visibility=["app"]` : caché au LLM | `{"todos": [...]}` |
 
-Tous renvoient `{"todos": [...]}`, que FastMCP envoie en `structuredContent` :
-l'UI n'a qu'à faire `setTodos(result.structuredContent.todos)`.
+`show_todos` et `show_stats` pointent vers **la même ressource UI**. L'app React
+regarde le `structuredContent` reçu : s'il contient `todos`, elle affiche la
+liste ; s'il contient `stats`, le graphique. Les boutons « Semaine / Mois » et
+« ‹ › » ne font que rappeler `show_stats` avec d'autres arguments.
+
+### Historique et statistiques
+
+- Chaque tâche a `created_at` et `done_at`. `done_at` est rempli quand on la
+  coche et effacé quand on la décoche (`Todo.set_done`), via MCP comme via REST.
+- `todos/stats.py` compte chaque tâche **dans la période où elle a été créée**,
+  puis la classe « effectuée » ou « à faire » selon son état actuel.
+  Semaine = du lundi au dimanche, une barre par jour. Mois = une barre par
+  semaine, coupée aux bords du mois.
+- Le texte du résultat contient aussi ces chiffres : tu peux demander à Claude
+  « combien de tâches ai-je terminées le mois dernier ? ».
 
 ## Lancer
 
@@ -66,12 +85,18 @@ cd frontend && npm install && npm run build
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python manage.py migrate
 ```
 
+Données factices (~250 tâches sur 10 semaines, **supprime les tâches existantes**) :
+
+```bash
+cd backend && .venv/bin/python manage.py seed_todos
+```
+
 ```bash
 cd backend && .venv/bin/uvicorn config.asgi:application --port 8765
 ```
 
 - Serveur MCP : `http://localhost:8765/mcp`
-- API REST : `http://localhost:8765/api/todos/`
+- API REST : `http://localhost:8765/api/todos/` et `http://localhost:8765/api/todos/stats/?period=month`
 
 > Après chaque modif de `src/main.tsx`, relance `npm run build` (ou `npm run dev`
 > qui rebuild en continu). Le serveur relit le fichier à chaque requête.
